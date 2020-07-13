@@ -1,0 +1,69 @@
+---
+title: "Carte_BF"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(latexpdf)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Importation du package
+library(raster)
+
+#Ensemble de la Burkina
+
+BF_Formes <- getData(name="GADM", country="BFA", level=1)
+colors=rainbow(length(BF_Formes$NAME_1))
+plot(BF_Formes, col=colors, main="Carte du Burkina Faso")
+text(coordinates(BF_Formes), labels = BF_Formes$NAME_1,cex=0.6)
+#legend("topleft",legend=BF_Formes$NAME_1,fill=colors,cex=1.3,bty="n" )
+```
+
+```{r}
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+#Importation du package
+library(raster)
+#Importation d'une base sur les ménages vulnérables
+library(readxl)
+Nb_menage <- read_excel("C:/Users/USER/Desktop/Carte_BF avec R/Nb_menage.xlsx")
+
+
+#Obtenir les formes
+
+BF_Formes <- getData(name="GADM", country="BFA", level=3)
+plot(BF_Formes, main="Carte du Burkina Faso")
+text(coordinates(BF_Formes), labels = BF_Formes$NAME_3,cex=0.2)
+names(BF_Formes)
+
+#Établissement de l'index
+idx <- match(BF_Formes$NAME_3, as.character(Nb_menage$Name))
+
+#Tranfert des données pour une variable (le nombre de votants sur le nombre d'inscrits) en fonction de la règle de concordance
+concordance <- Nb_menage[idx, "Nombre_menage"]
+BF_Formes$Nombre_menage <- concordance
+
+#Tracage de la carte
+#établissemment de la charte des coupeurs puis tracage de la carte en utilisant
+couleurs <- rainbow(99, start=.1)
+#spplot(BF_Formes, "Nombre_menage", col.regions= couleurs,  main=list(label="Nombre de ménage BF",cex=1.3))
+spplot(BF_Formes, "Nombre_menage", palette="Black",  main=list(label="Nombre de ménage BF",cex=0.2))
+#ccCarte12
+```
+
+
+```{r}
+```
+
+
+
+

@@ -1,0 +1,409 @@
+---
+title: "Récapitulatif Ménages Vulnérables"
+resource_files:
+- Nb_menage.xlsx
+- education_2018.xlsx
+- Recap_donnesPAM.xlsx
+- regression_estim.xlsx
+- gadm36_BFA_0_sp.rds
+- gadm36_BFA_1_sp.rds
+- gadm36_BFA_2_sp.rds
+- gadm36_BFA_3_sp.rds
+- Carte_Commune_menage_vul/Carte_Commune_menage_vul.Rproj
+output:
+  flexdashboard::flex_dashboard:
+    logo: logo.png
+    navbar:
+    - align: right
+      href: https://danielschillem.wixsite.com/spcnps2019
+      title: SP-CNPS
+    output: html_document
+    runtime: shiny_prerendered
+    smooth_scroll: yes
+    social:
+    - facebook
+    - menu
+    theme: cerulean
+    vertical_layout: fill
+---
+
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(usethis)
+library(devtools)
+pacman:: p_load(flexdashboard,rcdimple,DT)
+devtools::install_github("Bart6114/dimple")
+library(raster)
+library(knitr)
+library(rpivotTable)
+library(ggplot2)
+library(openintro)
+library(DT)
+library(pacman)
+library(readxl)
+library(knitr)
+library(dplyr)
+knitr::opts_chunk$set(echo = FALSE)
+library(reshape2)
+library(ggalt)
+library(dimple)
+library(rsconnect)
+library(htmlwidgets)
+Nb_menage <- read_excel("C:/Users/USER/Desktop/Carte_BF avec R/Nb_menage.xlsx")
+Recap_donnesPAM <- read_excel("C:/Users/USER/Desktop/Carte_BF avec R/Recap_donnesPAM.xlsx")
+education_2018 <- read_excel("C:/Users/USER/Desktop/Carte_BF avec R/education_2018.xlsx")
+regression_estim <- read_excel("C:/Users/USER/Desktop/Carte_BF avec R/regression_estim.xlsx")
+```
+
+Accueil {data-icon="fas fa-user-circle"}
+================================
+
+row {data-width=650}
+-----------------------------------------------------------------------
+
+### Burkina Faso: Représentation des communes en fonction du nombre de ménages vulnérables 
+
+```{r}
+BF_Formes <- getData(name="GADM", country="BFA", level=3)
+#Établissement de l'index
+idx <- match(BF_Formes$NAME_3, as.character(Nb_menage$Commune))
+
+#Tranfert des données pour une variable (le nombre de votants sur le nombre d'inscrits) en fonction de la règle de concordance
+concordance <- Nb_menage[idx, "Nbre_menage_vul"]
+BF_Formes$Nbre_menage_vul <- concordance
+
+#Tracage de la carte
+#établissemment de la charte des coupeurs puis tracage de la carte en utilisant
+couleurs <- rainbow(99, start=.1)
+#spplot(BF_Formes, "Nbre_menage_vul", col.regions= couleurs,  main=list(label="Nombre de ménage BF",cex=1.3))
+spplot(BF_Formes, "Nbre_menage_vul", palette="Black",  main=list(label="Ménages vulnérables repartis par communes",cex=1.2),
+       sp.layout = list("sp.points", BF_Formes, pch=20, cex=2, col='red'))
+```
+
+row {.tabset .tabset-fade}
+-------------------------------------
+
+
+### Données disponibles
+Link to [Village/Commune]
+ 
+```{r}
+
+
+#kable(data, "html")
+DT::datatable(Nb_menage[ , c("Year", "Region", "Province","Commune","Nbre_menage_vul","Nbre_pers_vul")],
+              rownames = FALSE, options = list(pageLength = 20)
+)
+
+```
+
+
+### Zones urbaines
+
+```{r}
+#barplot(data$Nbre_menage_vul, main="Répartition des menage vul", 
+#        xlab="ddd",
+#       legend = rownames(data$Name))
+DT::datatable(Recap_donnesPAM[, c(names(Recap_donnesPAM))],
+  rownames = FALSE, options = list(pageLength = 4)
+)
+
+```
+
+
+
+Repartition {data-navmenu="Menu"}
+========================================================
+
+
+    
+### Graphique descriptif
+
+```{r echo=FALSE}
+data=Nb_menage[c(1:60),]
+theme_set(theme_bw())
+Nbre_menage_vul=data$Nbre_menage_vul
+# Draw plot
+ggplot(data, aes(x=Commune, y=Nbre_menage_vul)) + 
+  geom_bar(stat="identity", width=.3,col="white",aes(fill=..Nbre_menage_vul..)) + 
+  scale_fill_gradient("Nbre_menage_vul",low = "Orange", high = "skyblue")+
+  labs(title="Répartition des ménages vulnérables 2016, 2017 et 2018", 
+       subtitle="Nombre de ménages vulnérables par commune") + 
+  theme(axis.text.x = element_text(angle=90, vjust=0.1,size=5 ),
+            axis.text.y = element_text(size=5),
+            strip.text = element_text(size=5), plot.title = element_text(color = "Black", size = 12, face = "bold"),
+  plot.subtitle = element_text(color = "blue")) + facet_wrap(~ Year,ncol=1, scale="free",labeller = label_both) + 
+      expand_limits(y=0)
+
+```
+
+
+Village/Commune {data-icon="fa-users"}
+========================================================
+
+Column {data-width=500}
+-------------------------------------
+
+### Commune/Village
+Link to [Accueil]
+```{r echo=FALSE}
+
+dimple(Nb_menage[c(1:60),],
+       xCategory=c("N_Region"),
+       yMeasure="Nbre_village",
+       series=c("Region","Commune","Province","Type de commune","Year"),
+        legend=TRUE,
+       chartType="bubble")
+```
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Selected {data-height=180}
+
+```{r}
+## The shiny part
+Choix <- sort(unique(Nb_menage[c(1:60),]$Commune))
+selectInput("Commune_choisi","Commune: ", Choix, selected = 'Yaba')
+```
+
+### Ménages vulnérables {data-height=70}
+```{r}
+renderValueBox({
+  valueBox(value = Nb_menage[Nb_menage$Commune==input$Commune_choisi,6], icon = "fa-pencil")
+})
+
+
+```
+
+### Personnes vulnérables {data-height=50}
+```{r}
+renderValueBox({
+  valueBox(value = Nb_menage[Nb_menage$Commune==input$Commune_choisi,7], icon = "fa-pencil")
+})
+
+
+```
+
+### Villages {data-height=50}
+```{r}
+renderValueBox({
+  valueBox(value = Nb_menage[Nb_menage$Commune==input$Commune_choisi,c(5,8)], icon = "fa-users",color = "olive")
+})
+
+
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+myicon <- ifelse(Nb_menage$Nbre_village[1] > Nb_menage$Nbre_village[2],"fa-arrow-up","fa-arrow-down")
+mycolor <- ifelse(Nb_menage$Nbre_village[1] > Nb_menage$Nbre_village[2],"success","danger")
+valueBox(scales::dollar(Nb_menage$Nbre_village[1]),color=mycolor,icon=myicon)
+```
+
+
+
+
+```{r eval=FALSE, include=FALSE}
+### Data {data-height=280}
+DT::datatable(Nb_menage[1:60,c("N_Region","Region","Commune","Type de commune","Nbre_village")],
+  rownames = FALSE, options = list(pageLength = 10)
+)
+
+
+```
+
+
+
+Education{data-navmenu="Menu"}
+================================
+
+row {data-width=650}
+-----------------------------------------------------------------------
+
+### Graphiques
+
+```{r echo=FALSE}
+
+# Draw plot
+Eleves_scolar=education_2018$Eleves_scolar
+ggplot(data=education_2018, aes(x=COMMUNES,y=Eleves_scolar)) + 
+  geom_bar(stat="identity", width=.5, col="blue", aes(fill=..Eleves_scolar..)) + 
+  scale_fill_gradient("Eleves_scolar",low = "red", high = "green")+
+  geom_smooth(method = 'loess',formula= COMMUNES~Eleves_scolar) +
+  labs(title="PROGRAMME EDUCATION: Communes de 2016, 2017", 
+       subtitle="Présentation du nombre de personnes scolarisées") + 
+  theme(axis.text.x = element_text(angle=90, vjust=0.5))
+ 
+```
+
+row {.tabset .tabset-fade}
+-------------------------------------
+### Données Programme Education
+
+```{r}
+DT::datatable(education_2018[, c(names(education_2018))],
+  rownames = FALSE, options = list(pageLength = 15)
+)
+```
+
+
+
+
+Evolution {data-icon="fa-signal"}
+================================
+
+row {data-width=500}
+-----------------------------------------------------------------------
+
+
+### Evolution
+```{r}
+
+comColor <- "#69b3a2"
+menColor <- rgb(0.2, 0.6, 0.9, 1)
+attach(regression_estim)
+ggplot(regression_estim, aes(x=Years)) +
+  
+  geom_bar( aes(y=Nbre_menage_vul), stat="identity", size=.1, fill=comColor, color="black", alpha=.4) + 
+  geom_line( aes(y=Nbre_commune*500), size=2, color=menColor) +
+  
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "Nombre Menages Vulnérables",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~./500 , name="Nombre Commune")
+  ) + 
+  
+  theme(
+    axis.title.y = element_text(color = comColor, size=13),
+    axis.title.y.right = element_text(color = menColor, size=13),
+    legend.position = "Center"
+  ) +
+
+  ggtitle("Graphe combiné des évolutions")+
+  geom_label(aes(y=Nbre_commune, label=Nbre_commune))+
+   geom_text(aes(y=Nbre_menage_vul, label=Nbre_menage_vul))
+
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+
+evolut=data.frame(x=c(2016,2017,2018),y=c(1318,5713,17410),z=c(5,23,61))
+print(evolut)
+evolut <- melt(evolut, id.vars = "x", measure.vars = c("y", "z"))
+
+ ggplot(evolut, aes(x = x, y = value)) +
+      geom_point(aes(group = variable, color = variable)) +geom_smooth(aes(group = variable, color = variable))
+      scale_colour_manual(values=c("red","blue"))
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+data2=Nb_menage[1:60,]
+
+qplot(Nbre_pers_vul, geom = "histogram",
+facets = Year ~ ., data = data2)
+```
+
+row {data-width=500}
+-------------------------------------
+### Couverture communes
+
+```{r}
+mycols <- c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF","Black")
+pilot=5*100/351
+phase2=18*100/351
+phase3=40*100/351
+phase4=55*100/351
+non_couv=100-pilot-phase2-phase3-phase4
+couvert=data.frame(phase=c(pilot,phase2,phase3,phase4,non_couv),annee=c("2016","2017","2018","2019","A venir"),nb=c(5,18,40,55,233))
+
+
+# Ajouter la position de l'étiquette
+couvert<- couvert%>%
+  arrange(desc(nb)) %>%
+  mutate(lab.ypos = cumsum(phase) - 0.25*phase)
+
+
+ggplot(couvert, aes(x = 2, y = phase, fill = annee)) +
+  geom_bar(stat = "identity", color = "white") +
+  coord_polar(theta = "y", start = 0)+
+  geom_text(aes(y = lab.ypos, label = nb), color = "white")+
+  scale_fill_manual(values = mycols) +
+  theme_void()+
+  xlim(0.5, 2.5)
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+model=lm(formula = Nbre_pers_vul ~ Nbre_commune, data=regression_estim)
+summary(model)
+#model2=glm(formula = Nbre_pers_vul ~ Nbre_commune, family = gaussian, data=regression_estim)
+#model2
+model_men=lm(formula = Nbre_menage_vul ~ Nbre_commune, data=regression_estim)
+#<-aov(formula = Nbre_pers_vul ~ Nbre_commune, data=regression_estim)
+#summary(model_men)
+#predict(model, interval="confidence")
+
+#cor(Nbre_pers_vul,Nbre_commune, method="pearson")
+# ggplot(regression_estim, aes(x = Nbre_commune, y = Nbre_pers_vul)) +
+ #     geom_point(aes(x = Nbre_commune, y = Nbre_pers_vul)) +geom_smooth(aes(x = Nbre_commune, y = Nbre_pers_vul))+
+# geom_line(aes(y=model,col="red"))
+      
+      
+plot(Nbre_pers_vul ~ Nbre_commune, data=regression_estim)
+abline(model, col="red")
+```
+
+### Bénéficiaires programmes SP-CNPS
+
+```{r}
+benef=data.frame(meng=c(1318,1948,3643,10125),annee=c("2017","2018","2019","2020"))
+
+ggplot(benef) +
+  aes(x = annee, y = meng) +
+  geom_lollipop() +
+  xlab("Année") +
+  ylab("Nombre de bénéficiaires") +
+  coord_flip()+
+  geom_label(aes(y=meng, label=meng))
+```
+
+
+Data {data-navmenu="Menu"}
+========================================================
+
+```{r}
+renderDT({
+DT::datatable(
+  Nb_menage[,c(1:5,8:9,6,7)], extensions = 'Buttons', options = list(
+    dom = 'Blfrtip',
+    buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+    pageLength = 25,
+    lengthMenu = list(c(10, 25, 50, -1),c(10, 25, 50, "All"))
+  )
+)
+})
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+rsconnect::setAccountInfo(name='epiphanienikiema2020',
+			  token='DF231FF54FBDFBD6F7A7C17C55EC9035',
+			  secret='4biU+LiOf9traQ95LSrSjmyTpvZ0JnkSanFohuP0')
+rsconnect::deployApp('C:/Users/USER/Desktop/Carte_BF avec R/Carte_dashboard2.Rmd')
+
+runGitHub( "Carte", "ericaepiphanie")
+```
+
